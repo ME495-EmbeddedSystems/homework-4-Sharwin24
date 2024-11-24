@@ -1,8 +1,7 @@
 <launch>
 
   <!-- Start the nubot simulation -->
-  <include file="$(find nubot_gazebo)/launch/nubot_simulation.launch.xml"/>
-  <include file="$(find-pkg-share nubot)/launch/simulate.launch.py">
+  <include file="$(find-pkg-share nubot_nav)/simulate.launch.xml">
     <arg name="use_rviz" value="true" />
     <!-- <arg name="world" value="none" /> -->
   </include>
