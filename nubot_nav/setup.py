@@ -12,7 +12,7 @@ setup(
         ('share/' + package_name, [
             'package.xml',
             'launch/manual_explore.launch.xml',
-            '../../nubot/launch/simulate.launch.xml'
+            'config/nubot_nav_view.rviz'
         ]),
     ],
     install_requires=['setuptools'],
