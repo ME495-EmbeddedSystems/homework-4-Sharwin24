@@ -1,0 +1,19 @@
+<launch>
+
+  <!-- Start the nubot simulation -->
+  <include file="$(find nubot_gazebo)/launch/nubot_simulation.launch.xml"/>
+  <include file="$(find-pkg-share nubot)/launch/simulate.launch.py">
+    <arg name="use_rviz" value="true" />
+    <!-- <arg name="world" value="none" /> -->
+  </include>
+
+  <!-- Start the slam_toolbox in async mode -->
+  <!-- <include file="$(find slam_toolbox)/launch/run_slam_toolbox.launch.xml"/> -->
+
+  <!-- Start the nav2 stack -->
+  <!-- <include file="$(find nubot_nav)/launch/explore.launch.xml"/> -->
+
+  <!-- Start rviz -->
+  <!-- <node name="rviz" pkg="rviz2" type="rviz2" args="-d $(find nubot_nav)/config/nav2_default_view.rviz"/> -->
+
+</launch>
