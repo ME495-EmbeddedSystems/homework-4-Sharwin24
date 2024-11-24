@@ -17,6 +17,7 @@
     <arg name="use_sim_time" value="true"/>
     <arg name="slam" value="True"/>
     <arg name="autostart" value="true"/>
+    <arg name="params_file" value="$(find-pkg-share nubot_nav)/nubot_nav2_params.yaml"/>
   </include>
 
   <!-- Start rviz -->

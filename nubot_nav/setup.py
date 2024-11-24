@@ -12,7 +12,8 @@ setup(
         ('share/' + package_name, [
             'package.xml',
             'launch/manual_explore.launch.xml',
-            'config/nubot_nav_view.rviz'
+            'config/nubot_nav_view.rviz',
+            'config/nubot_nav2_params.yaml',
         ]),
     ],
     install_requires=['setuptools'],
