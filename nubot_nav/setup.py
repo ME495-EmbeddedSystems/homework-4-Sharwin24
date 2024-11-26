@@ -14,6 +14,7 @@ setup(
             'launch/manual_explore.launch.xml',
             'config/nubot_nav_view.rviz',
             'config/nubot_nav2_params.yaml',
+            'config/nubot_nav_slam_params.yaml',
         ]),
     ],
     install_requires=['setuptools'],
