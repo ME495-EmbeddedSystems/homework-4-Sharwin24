@@ -3,16 +3,22 @@ from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose, Quaternion
 import numpy as np
-from enum import Enum, auto
+from visualization_msgs.msg import MarkerArray, Marker
+import itertools
 
 
 class Frontier:
+    # -------------- Begin_Citation [2] --------------#
+    id_iter = itertools.count()
+
     def __init__(self, x, y):
+        self.id = next(self.id_iter)
+    # -------------- End_Citation [2] --------------#
         # (x,y ) defines the origin of the frontier
         self.x = x
         self.y = y
-        self.min_radius = 0.8  # Defines the inner radius of the "donut" frontier
-        self.max_radius = 2.0  # Defines the outer radius of the "donut" frontier
+        self.min_radius = 2.0  # Defines the inner radius of the "donut" frontier
+        self.max_radius = 5.0  # Defines the outer radius of the "donut" frontier
         self.explored = False
 
     def __eq__(self, value):
@@ -60,8 +66,8 @@ class Frontier:
         ori = Quaternion(
             x=0.0,
             y=0.0,
-            z=np.sin(heading / 2),
-            w=np.cos(heading / 2)
+            z=np.sin(heading / 2.0),
+            w=np.cos(heading / 2.0)
         )
         return Pose(x=rand_x, y=rand_y, orientation=ori)
 
@@ -100,12 +106,15 @@ class Explore(Node):
         self.map_sub = self.create_subscription(
             OccupancyGrid, '/map', self.map_callback, 10
         )
-        # Change this to a transform listener from map to base_link
+        # TODO: Change this to a transform listener from map to base_link
         self.robot_pose_sub = self.create_subscription(
             PoseWithCovarianceStamped, '/pose', self.robot_pose_callback, 10
         )
         self.pose_pub = self.create_publisher(
             PoseStamped, '/goal_pose', 10
+        )
+        self.frontier_pub = self.create_publisher(
+            MarkerArray, '/explore/frontiers', 10
         )
 
         # Robot Pose and Map
@@ -135,22 +144,43 @@ class Explore(Node):
             # Add the frontier to the frontier union
             self.frontier_map.add_frontier(first_frontier)
 
+            # Visualize the first frontier
+            frontier_markers = MarkerArray(
+                markers=[self.get_frontier_marker(first_frontier)]
+            )
+            self.frontier_pub.publish(frontier_markers)
+
             # Pick a random point from the frontier
             goal_pose = first_frontier.generate_random_pose()
 
             # Publish the goal pose
             self.send_robot(goal_pose)
-        else:
+        else:  # The frontier_map has frontiers
+            self.get_logger().info('Exploring Frontiers')
+            # Visualize the frontiers
+            frontier_markers = MarkerArray(
+                markers=[self.get_frontier_marker(
+                    f) for f in self.frontier_map.frontiers]
+            )
+            self.frontier_pub.publish(frontier_markers)
             # If the frontier_map has the first frontier
             # Check if the robot is at the goal pose
             if self.robot_at_goal():
+                self.get_logger().info(
+                    f'Robot at Goal Pose: {self.current_goal}'
+                )
                 # The robot is at the goal pose (or nearby)
                 # Get the robot's current position
-                robot_x = self.robot_pose.pose.pose.position.x
-                robot_y = self.robot_pose.pose.pose.position.y
+                if self.robot_pose is None:
+                    self.get_logger().warn('No Robot Pose Received Yet')
+                    return
+                # robot_x = self.robot_pose.pose.pose.position.x
+                # robot_y = self.robot_pose.pose.pose.position.y
 
                 # Create a new frontier here
-                new_frontier = Frontier(robot_x, robot_y)
+                goal_x = self.current_goal.position.x
+                goal_y = self.current_goal.position.y
+                new_frontier = Frontier(goal_x, goal_y)
 
                 # Select a random pose from the new frontier
                 # that isn't already in our Union of frontiers
@@ -159,6 +189,11 @@ class Explore(Node):
                     new_goal = new_frontier.generate_random_pose()
                 # After we've found our new goal, we can add the frontier to the union
                 self.frontier_map.add_frontier(new_frontier)
+                # Visualize the new frontier
+                frontier_markers.markers.append(
+                    self.get_frontier_marker(new_frontier, new=True)
+                )
+                self.frontier_pub.publish(frontier_markers)
 
                 # Publish the new goal pose
                 self.send_robot(new_goal)
@@ -184,6 +219,26 @@ class Explore(Node):
         goal_x = self.current_goal.position.x
         goal_y = self.current_goal.position.y
         return np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2) <= epsilon
+
+    def get_frontier_marker(self, frontier: Frontier, new: bool = False) -> Marker:
+        marker = Marker()
+        marker.header.frame_id = 'map'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'frontier'
+        marker.id = frontier.id
+        marker.type = Marker.CYLINDER
+        marker.action = Marker.ADD
+        marker.pose.position.x = frontier.x
+        marker.pose.position.y = frontier.y
+        marker.pose.position.z = 0.0
+        marker.scale.x = frontier.max_radius
+        marker.scale.y = frontier.max_radius
+        marker.scale.z = 0.1
+        marker.color.r = 0.0 if new else 1.0
+        marker.color.g = 1.0 if new else 0.0
+        marker.color.b = 0.0
+        marker.color.a = 0.75 if new else 0.5
+        return marker
 
 
 def main(args=None):
