@@ -156,13 +156,7 @@ class Explore(Node):
             # Publish the goal pose
             self.send_robot(goal_pose)
         else:  # The frontier_map has frontiers
-            self.get_logger().info('Exploring Frontiers')
-            # Visualize the frontiers
-            frontier_markers = MarkerArray(
-                markers=[self.get_frontier_marker(
-                    f) for f in self.frontier_map.frontiers]
-            )
-            self.frontier_pub.publish(frontier_markers)
+            self.get_logger().info('Exploring Frontiers', once=True)
             # If the frontier_map has the first frontier
             # Check if the robot is at the goal pose
             if self.robot_at_goal():
@@ -188,13 +182,18 @@ class Explore(Node):
                 while self.frontier_map.in_union(new_goal.position.x, new_goal.position.y):
                     new_goal = new_frontier.generate_random_pose()
                 # After we've found our new goal, we can add the frontier to the union
-                self.frontier_map.add_frontier(new_frontier)
+                # Visualize the frontiers
+                frontier_markers = MarkerArray(
+                    markers=[self.get_frontier_marker(
+                        f) for f in self.frontier_map.frontiers]
+                )
                 # Visualize the new frontier
                 frontier_markers.markers.append(
                     self.get_frontier_marker(new_frontier, new=True)
                 )
                 self.frontier_pub.publish(frontier_markers)
 
+                self.frontier_map.add_frontier(new_frontier)
                 # Publish the new goal pose
                 self.send_robot(new_goal)
 
