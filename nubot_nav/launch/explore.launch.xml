@@ -1,4 +1,6 @@
 <launch>
   <include file="$(find-pkg-share nubot_nav)/manual_explore.launch.xml"/>
-  <node name="explore" pkg="nubot_nav" exec="explore" />
+  <node name="explore" pkg="nubot_nav" exec="explore" >
+    <param name="use_sim_time" value="true"/>
+  </node>
 </launch>
