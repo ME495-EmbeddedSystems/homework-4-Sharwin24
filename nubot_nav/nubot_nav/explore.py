@@ -134,19 +134,19 @@ class Explore(Node):
             return
         elif self.frontier_map.is_empty():
             self.get_logger().info('Explore Node Received Map', once=True)
-            # Get the map's origin
-            map_origin_x = self.saved_map.info.origin.position.x
-            map_origin_y = self.saved_map.info.origin.position.y
+            # Get the robot's current position
+            robot_x = self.robot_pose.pose.pose.position.x
+            robot_y = self.robot_pose.pose.pose.position.y
 
             # Create a frontier at the map's origin since it is the first frontier
-            first_frontier = Frontier(map_origin_x, map_origin_y)
+            first_frontier = Frontier(robot_x, robot_y)
 
             # Add the frontier to the frontier union
             self.frontier_map.add_frontier(first_frontier)
 
             # Visualize the first frontier
             frontier_markers = MarkerArray(
-                markers=[self.get_frontier_marker(first_frontier)]
+                markers=[self.get_frontier_marker(first_frontier, new=True)]
             )
             self.frontier_pub.publish(frontier_markers)
 
@@ -168,8 +168,6 @@ class Explore(Node):
                 if self.robot_pose is None:
                     self.get_logger().warn('No Robot Pose Received Yet')
                     return
-                # robot_x = self.robot_pose.pose.pose.position.x
-                # robot_y = self.robot_pose.pose.pose.position.y
 
                 # Create a new frontier here
                 goal_x = self.current_goal.position.x
