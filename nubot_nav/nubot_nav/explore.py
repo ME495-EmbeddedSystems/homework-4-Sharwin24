@@ -17,8 +17,8 @@ class Frontier:
         # (x,y ) defines the origin of the frontier
         self.x = x
         self.y = y
-        self.min_radius = 2.0  # Defines the inner radius of the "donut" frontier
-        self.max_radius = 5.0  # Defines the outer radius of the "donut" frontier
+        self.min_radius = 3.0  # Defines the inner radius of the "donut" frontier
+        self.max_radius = 10.0  # Defines the outer radius of the "donut" frontier
         self.explored = False
 
     def __eq__(self, value):
