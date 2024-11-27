@@ -3,6 +3,7 @@ from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose, Quaternion
 import numpy as np
+from enum import Enum, auto
 
 
 class Frontier:
@@ -33,11 +34,11 @@ class Frontier:
         distance = np.sqrt(((x - self.x) ** 2 + (y - self.y) ** 2))
         return self.min_radius <= distance <= self.max_radius
 
-    def get_random_point(self) -> Pose:
-        # -------------- BEGIN_CITATION 1 --------------#
+    def generate_random_pose(self) -> Pose:
+        # -------------- Begin_Citation [1] --------------#
         # NOTE: I'm not randomly picking this point using polar coordinates
         # because it isn't uniformly distributed.
-        # -------------- END_CITATION 1 --------------#
+        # -------------- End_Citation [1] --------------#
         rand_x = np.random.uniform(
             self.x - self.max_radius,
             self.x + self.max_radius
@@ -79,7 +80,7 @@ class FrontierUnion:
         return len(self.frontiers) == 0
 
     def in_union(self, x: float, y: float) -> bool:
-        return any([frontier.contains(x, y) for frontier in self.frontiers])
+        return any(frontier.contains(x, y) for frontier in self.frontiers)
 
 
 # Frontier Algorithm:
@@ -99,6 +100,7 @@ class Explore(Node):
         self.map_sub = self.create_subscription(
             OccupancyGrid, '/map', self.map_callback, 10
         )
+        # Change this to a transform listener from map to base_link
         self.robot_pose_sub = self.create_subscription(
             PoseWithCovarianceStamped, '/pose', self.robot_pose_callback, 10
         )
@@ -107,9 +109,10 @@ class Explore(Node):
         )
 
         # Robot Pose and Map
-        self.robot_pose = None
-        self.saved_map = None
+        self.robot_pose: PoseWithCovarianceStamped = None
+        self.saved_map: OccupancyGrid = None
         self.frontier_map = FrontierUnion()
+        self.current_goal: Pose = None
 
         # Timer for frontier exploration
         self.freq = 10  # [Hz]
@@ -133,40 +136,54 @@ class Explore(Node):
             self.frontier_map.add_frontier(first_frontier)
 
             # Pick a random point from the frontier
-            goal_pose = first_frontier.get_random_point()
+            goal_pose = first_frontier.generate_random_pose()
 
             # Publish the goal pose
-            goal_pose_msg = PoseStamped()
-            goal_pose_msg.pose = goal_pose
-            goal_pose_msg.header.frame_id = 'map'
-            goal_pose_msg.header.stamp = self.get_clock().now().to_msg()
+            self.send_robot(goal_pose)
         else:
             # If the frontier_map has the first frontier
-            # Get the robot's current position
-            robot_x = self.robot_pose.pose.position.x
-            robot_y = self.robot_pose.pose.position.y
-
             # Check if the robot is at the goal pose
-            if self.frontier_map.in_union(robot_x, robot_y):
+            if self.robot_at_goal():
+                # The robot is at the goal pose (or nearby)
+                # Get the robot's current position
+                robot_x = self.robot_pose.pose.pose.position.x
+                robot_y = self.robot_pose.pose.pose.position.y
 
-                # Select a new frontier that is not in the union of all frontiers
+                # Create a new frontier here
                 new_frontier = Frontier(robot_x, robot_y)
+
+                # Select a random pose from the new frontier
+                # that isn't already in our Union of frontiers
+                new_goal = new_frontier.generate_random_pose()
+                while self.frontier_map.in_union(new_goal.position.x, new_goal.position.y):
+                    new_goal = new_frontier.generate_random_pose()
+                # After we've found our new goal, we can add the frontier to the union
                 self.frontier_map.add_frontier(new_frontier)
 
-                # Pick a random point from the new frontier
-                goal_pose = new_frontier.get_random_point()
-
-                # Publish the goal pose
-                goal_pose_msg = PoseStamped()
-                goal_pose_msg.pose = goal_pose
-                goal_pose_msg.header.frame_id = 'map'
-                goal_pose_msg.header.stamp = self.get_clock().now().to_msg()
+                # Publish the new goal pose
+                self.send_robot(new_goal)
 
     def robot_pose_callback(self, msg):
         self.robot_pose = msg
 
     def map_callback(self, msg):
         self.saved_map = msg
+
+    def send_robot(self, pose: Pose):
+        # Check if the robot is travelling towards the goal pose
+        goal_pose_msg = PoseStamped()
+        goal_pose_msg.pose = pose
+        goal_pose_msg.header.frame_id = 'map'
+        goal_pose_msg.header.stamp = self.get_clock().now().to_msg()
+        self.current_goal = pose
+        self.pose_pub.publish(goal_pose_msg)
+
+    def robot_at_goal(self, epsilon: float = 0.1) -> bool:
+        robot_x = self.robot_pose.pose.pose.position.x
+        robot_y = self.robot_pose.pose.pose.position.y
+        goal_x = self.current_goal.position.x
+        goal_y = self.current_goal.position.y
+        return np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2) <= epsilon
 
 
 def main(args=None):
