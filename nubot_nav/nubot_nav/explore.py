@@ -152,7 +152,8 @@ class Explore(Node):
 
             # Visualize the first frontier
             frontier_markers = MarkerArray(
-                markers=[self.get_frontier_marker(first_frontier, new=True)]
+                markers=[self.get_frontier_marker(
+                    first_frontier, new=True, first=True)]
             )
             self.frontier_pub.publish(frontier_markers)
 
@@ -246,7 +247,7 @@ class Explore(Node):
         goal_y = self.current_goal.position.y
         return np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2) <= epsilon
 
-    def get_frontier_marker(self, frontier: Frontier, new: bool = False) -> Marker:
+    def get_frontier_marker(self, frontier: Frontier, new: bool = False, first: bool = False) -> Marker:
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.get_clock().now().to_msg()
@@ -260,10 +261,16 @@ class Explore(Node):
         marker.scale.x = frontier.max_radius
         marker.scale.y = frontier.max_radius
         marker.scale.z = 0.1
-        marker.color.r = 0.0 if new else 1.0
-        marker.color.g = 1.0 if new else 0.0
-        marker.color.b = 0.0
-        marker.color.a = 0.75 if new else 0.5
+        if first:
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker.color.a = 0.75
+        else:
+            marker.color.r = 0.0 if new else 1.0
+            marker.color.g = 1.0 if new else 0.0
+            marker.color.b = 0.0
+            marker.color.a = 0.75 if new else 0.5
         return marker
 
 
