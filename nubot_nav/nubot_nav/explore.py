@@ -167,8 +167,9 @@ class Explore(Node):
             # Check if the robot is at the goal pose
             if self.robot_at_goal():
                 self.get_logger().info(
-                    f'Robot at Goal Pose: {self.current_goal.position.x:.3f}, {
-                        self.current_goal.position.y:.3f}'
+                    'Robot at Goal Pose: ' +
+                    f'({self.current_goal.position.x:.3f}, ' +
+                    f'{self.current_goal.position.y:.3f})'
                 )
                 # The robot is at the goal pose (or nearby)
                 # Get the robot's current position
@@ -232,9 +233,9 @@ class Explore(Node):
         goal_pose_msg.header.frame_id = 'map'
         goal_pose_msg.header.stamp = self.get_clock().now().to_msg()
         self.current_goal = pose
-        self.get_logger(
-            f'Sending Robot to Goal Pose: {
-                pose.position.x:.3f}, {pose.position.y:.3f}'
+        self.get_logger().info(
+            'Sending Robot to Goal Pose: ' +
+            f'({pose.position.x:.3f}, {pose.position.y:.3f})'
         )
         self.pose_pub.publish(goal_pose_msg)
 
