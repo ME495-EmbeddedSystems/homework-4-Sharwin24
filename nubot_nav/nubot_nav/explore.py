@@ -138,6 +138,9 @@ class Explore(Node):
         elif self.frontier_map.is_empty():
             self.get_logger().info('Explore Node Received Map', once=True)
             # Get the robot's current position
+            if self.robot_pose is None:
+                self.get_logger().warn('No Robot Pose Received Yet')
+                return
             robot_x = self.robot_pose.position.x
             robot_y = self.robot_pose.position.y
 
@@ -164,7 +167,8 @@ class Explore(Node):
             # Check if the robot is at the goal pose
             if self.robot_at_goal():
                 self.get_logger().info(
-                    f'Robot at Goal Pose: {self.current_goal}'
+                    f'Robot at Goal Pose: {self.current_goal.position.x:.3f}, {
+                        self.current_goal.position.y:.3f}'
                 )
                 # The robot is at the goal pose (or nearby)
                 # Get the robot's current position
@@ -228,11 +232,15 @@ class Explore(Node):
         goal_pose_msg.header.frame_id = 'map'
         goal_pose_msg.header.stamp = self.get_clock().now().to_msg()
         self.current_goal = pose
+        self.get_logger(
+            f'Sending Robot to Goal Pose: {
+                pose.position.x:.3f}, {pose.position.y:.3f}'
+        )
         self.pose_pub.publish(goal_pose_msg)
 
-    def robot_at_goal(self, epsilon: float = 0.1) -> bool:
-        robot_x = self.robot_pose.pose.pose.position.x
-        robot_y = self.robot_pose.pose.pose.position.y
+    def robot_at_goal(self, epsilon: float = 0.5) -> bool:
+        robot_x = self.robot_pose.position.x
+        robot_y = self.robot_pose.position.y
         goal_x = self.current_goal.position.x
         goal_y = self.current_goal.position.y
         return np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2) <= epsilon
