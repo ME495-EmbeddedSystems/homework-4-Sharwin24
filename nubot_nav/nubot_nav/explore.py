@@ -4,6 +4,7 @@ from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose, Quaternion
 import numpy as np
 from visualization_msgs.msg import MarkerArray, Marker
+from tf2_ros import Buffer, TransformListener
 import itertools
 
 
@@ -106,10 +107,6 @@ class Explore(Node):
         self.map_sub = self.create_subscription(
             OccupancyGrid, '/map', self.map_callback, 10
         )
-        # TODO: Change this to a transform listener from map to base_link
-        self.robot_pose_sub = self.create_subscription(
-            PoseWithCovarianceStamped, '/pose', self.robot_pose_callback, 10
-        )
         self.pose_pub = self.create_publisher(
             PoseStamped, '/goal_pose', 10
         )
@@ -117,8 +114,12 @@ class Explore(Node):
             MarkerArray, '/explore/frontiers', 10
         )
 
+        # Setup a Transform Listener
+        self.buffer = Buffer()
+        self.listener = TransformListener(self.buffer, self)
+
         # Robot Pose and Map
-        self.robot_pose: PoseWithCovarianceStamped = None
+        self.robot_pose: Pose = None
         self.saved_map: OccupancyGrid = None
         self.frontier_map = FrontierUnion()
         self.current_goal: Pose = None
@@ -128,6 +129,8 @@ class Explore(Node):
         self.create_timer(1.0 / self.freq, self.timer_callback)
 
     def timer_callback(self):
+        # Get the transform from the map to the robot and save it
+        self.update_robot_pose()
         # Run a Frontier Exploration Algorithm
         if self.saved_map is None:
             self.get_logger().info('No Map Received Yet', once=True)
@@ -135,8 +138,8 @@ class Explore(Node):
         elif self.frontier_map.is_empty():
             self.get_logger().info('Explore Node Received Map', once=True)
             # Get the robot's current position
-            robot_x = self.robot_pose.pose.pose.position.x
-            robot_y = self.robot_pose.pose.pose.position.y
+            robot_x = self.robot_pose.position.x
+            robot_y = self.robot_pose.position.y
 
             # Create a frontier at the map's origin since it is the first frontier
             first_frontier = Frontier(robot_x, robot_y)
@@ -195,8 +198,25 @@ class Explore(Node):
                 # Publish the new goal pose
                 self.send_robot(new_goal)
 
-    def robot_pose_callback(self, msg):
-        self.robot_pose = msg
+    def update_robot_pose(self):
+        map_to_robot = None
+        try:
+            map_to_robot = self.buffer.lookup_transform(
+                source_frame='map',
+                target_frame='base_link',
+                time=rclpy.time.Time()
+            )
+        except Exception as e:
+            self.get_logger().warn(f'Failed to get transform: {e}')
+            return
+        if map_to_robot is None:
+            self.get_logger().warn('No Transform Received')
+            return
+        self.robot_pose = Pose()
+        self.robot_pose.position.x = map_to_robot.transform.translation.x
+        self.robot_pose.position.y = map_to_robot.transform.translation.y
+        self.robot_pose.position.z = map_to_robot.transform.translation.z
+        self.robot_pose.orientation = map_to_robot.transform.rotation
 
     def map_callback(self, msg):
         self.saved_map = msg
