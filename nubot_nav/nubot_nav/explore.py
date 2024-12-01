@@ -294,7 +294,7 @@ class Explore(Node):
             new_goal = new_frontier.generate_random_pose()
         return new_goal
 
-    def get_frontier_marker(self, frontier: Frontier, new: bool = False, first: bool = False) -> Marker:
+    def get_frontier_marker(self, frontier: Frontier) -> Marker:
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.get_clock().now().to_msg()
@@ -308,16 +308,19 @@ class Explore(Node):
         marker.scale.x = frontier.max_radius
         marker.scale.y = frontier.max_radius
         marker.scale.z = 0.1
-        if first:
+        if frontier.id == 0:
             marker.color.r = 0.0
             marker.color.g = 1.0
             marker.color.b = 0.0
-            marker.color.a = 0.75
+        elif frontier.explored:
+            marker.color.r = 0.0
+            marker.color.g = 0.0
+            marker.color.b = 1.0
         else:
-            marker.color.r = 0.0 if new else 1.0
-            marker.color.g = 1.0 if new else 0.0
+            marker.color.r = 1.0
+            marker.color.g = 0.0
             marker.color.b = 0.0
-            marker.color.a = 0.75 if new else 0.5
+        marker.color.a = 0.5
         return marker
 
 
