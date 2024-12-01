@@ -42,8 +42,8 @@ class Frontier:
 
     def random_pose_cart(self) -> Pose:
         # -------------- Begin_Citation [1] --------------#
-        # NOTE: I'm not randomly picking this point using polar coordinates
-        # because it isn't uniformly distributed.
+        # NOTE: Supposedly polar coordinates aren't uniformly distributed
+        # so this function can be used instead
         # -------------- End_Citation [1] --------------#
         random_pose = Pose()
         rand_x = random.random() * 2 * self.max_radius + self.x - self.max_radius
