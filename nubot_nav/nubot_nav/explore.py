@@ -136,7 +136,7 @@ class Explore(Node):
         # Get the transform from the map to the robot and save it
         self.update_robot_pose()
         # Run a Frontier Exploration Algorithm
-        if self.saved_map is None:
+        if self.saved_map is None or self.robot_pose is None:
             self.get_logger().info('No Map Received Yet', once=True)
             return
         elif self.frontier_map.is_empty():
@@ -203,31 +203,30 @@ class Explore(Node):
                 self.frontier_pub.publish(frontier_markers)
                 self.frontier_map.add_frontier(new_frontier)
                 self.send_robot(new_goal)
-            else:
-                # Check if the robot is moving and if not
-                # we need to select a new goal pose
-                self.get_logger().info(
-                    f'Robot Unmoving Count: {self.robot_unmoving_count}' +
-                    ' Checking if robot is moving...'
-                )
-                distance = np.sqrt(
-                    (self.robot_pose.position.x - self.prev_robot_pose.position.x) ** 2 +
-                    (self.robot_pose.position.y -
-                     self.prev_robot_pose.position.y) ** 2
-                )
-                if distance <= 0.1:
-                    self.robot_unmoving_count += 1
-                if self.robot_unmoving_count >= self.goal_failed_threshold:
-                    self.get_logger().warn(
-                        'Robot Failed to Move ' +
-                        f'{self.robot_unmoving_count} Times'
-                    )
-                    self.robot_unmoving_count = 0
-                    latest_frontier = self.frontier_map.get_latest_frontier()
-                    # Delete the latest frontier
-                    self.frontier_map.remove_frontier(latest_frontier)
-                    new_goal = self.generate_random_goal(latest_frontier)
-                    self.send_robot(new_goal)
+        # Check if the robot is moving and if not
+        # we need to select a new goal pose
+        self.get_logger().info(
+            f'Robot Unmoving Count: {self.robot_unmoving_count}' +
+            ' Checking if robot is moving...'
+        )
+        distance = np.sqrt(
+            (self.robot_pose.position.x - self.prev_robot_pose.position.x) ** 2 +
+            (self.robot_pose.position.y -
+                self.prev_robot_pose.position.y) ** 2
+        )
+        if distance <= 0.1:
+            self.robot_unmoving_count += 1
+        if self.robot_unmoving_count >= self.goal_failed_threshold:
+            self.get_logger().warn(
+                'Robot Failed to Move ' +
+                f'{self.robot_unmoving_count} Times'
+            )
+            self.robot_unmoving_count = 0
+            latest_frontier = self.frontier_map.get_latest_frontier()
+            # Delete the latest frontier
+            self.frontier_map.remove_frontier(latest_frontier)
+            new_goal = self.generate_random_goal(latest_frontier)
+            self.send_robot(new_goal)
 
     def update_robot_pose(self):
         map_to_robot = None
