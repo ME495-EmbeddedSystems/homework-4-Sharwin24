@@ -1,8 +1,9 @@
 <launch>
-
+  <arg name="world" default="$(find-pkg-share nubot)/worlds/nubot_world.sdf" description="World file to load"/>
   <!-- Start the nubot simulation -->
   <include file="$(find-pkg-share nubot)/launch/simulate.launch.xml">
     <arg name="use_rviz" value="False" />
+    <arg name="world" value="$(var world)" />
   </include>
 
   <!-- Start the slam_toolbox in async mode -->

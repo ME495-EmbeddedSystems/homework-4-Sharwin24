@@ -38,9 +38,9 @@ class Frontier:
     def contains(self, x, y):
         # Check if the point (x, y) is within the "donut" frontier
         distance = np.sqrt(((x - self.x) ** 2 + (y - self.y) ** 2))
-        return distance > self.min_radius and distance < self.max_radius
+        return self.min_radius <= distance <= self.max_radius
 
-    def generate_random_pose(self) -> Pose:
+    def random_pose_cart(self) -> Pose:
         # -------------- Begin_Citation [1] --------------#
         # NOTE: I'm not randomly picking this point using polar coordinates
         # because it isn't uniformly distributed.
@@ -60,6 +60,29 @@ class Frontier:
             y=0.0,
             z=np.sin(heading / 2.0),
             w=np.cos(heading / 2.0)
+        )
+        return random_pose
+
+    def random_pose_polar(self) -> Pose:
+        random_pose = Pose()
+        # Generate a random radius with uniform area weighting
+        rand_radius = np.sqrt(
+            random.uniform(self.min_radius ** 2, self.max_radius ** 2)
+        )
+        # Generate a random angle
+        rand_angle = random.uniform(0, 2 * np.pi)
+        # Convert polar coordinates to Cartesian
+        rand_x = self.x + rand_radius * np.cos(rand_angle)
+        rand_y = self.y + rand_radius * np.sin(rand_angle)
+        # Set the position of the pose
+        random_pose.position.x = rand_x
+        random_pose.position.y = rand_y
+        # Set the orientation to face outward from the center
+        random_pose.orientation = Quaternion(
+            x=0.0,
+            y=0.0,
+            z=np.sin(rand_angle / 2.0),
+            w=np.cos(rand_angle / 2.0)
         )
         return random_pose
 
@@ -89,10 +112,21 @@ class FrontierUnion:
 if __name__ == '__main__':
     frontier = Frontier(0, 0)
     print(frontier)
-    print('Generating 10 random poses:')
+    print('Generating 10 random poses (cartesian):')
     for _ in range(10):
-        rand_pose = frontier.generate_random_pose()
+        rand_pose = frontier.random_pose_cart()
         print(
             f'Random Pose: ({rand_pose.position.x:.3f}, ' +
             f'{rand_pose.position.y:.3f})'
         )
+        # verify that the random pose is within the frontier
+        assert frontier.contains(rand_pose.position.x, rand_pose.position.y)
+    print('Generating 10 random poses (polar):')
+    for _ in range(10):
+        rand_pose = frontier.random_pose_polar()
+        print(
+            f'Random Pose: ({rand_pose.position.x:.3f}, ' +
+            f'{rand_pose.position.y:.3f})'
+        )
+        # verify that the random pose is within the frontier
+        assert frontier.contains(rand_pose.position.x, rand_pose.position.y)
