@@ -1,7 +1,8 @@
 <launch>
+  <arg name="explore_type" default="frontier" description="Exploration Algorithm [frontier, random]"/>
   <include file="$(find-pkg-share nubot_nav)/manual_explore.launch.xml"/>
   <node name="explore" pkg="nubot_nav" exec="explore" >
     <param name="use_sim_time" value="true"/>
-    <param name="explore_type" value="frontier" description="frontier or random"/>
+    <param name="explore_type" value="$(var explore_type)"/>
   </node>
 </launch>

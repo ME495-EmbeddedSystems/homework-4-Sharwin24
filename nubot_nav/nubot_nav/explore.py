@@ -51,15 +51,14 @@ class Explore(Node):
         self.current_goal: Pose = None
         # How many times we need to publish a goal pose without the robot moving
         # to deem it a rejected goal
-        self.goal_failed_threshold = 15
+        self.goal_failed_threshold = 5
         self.robot_unmoving_count = 0
 
+        self.freq = 10  # [Hz]
         # Timer for frontier exploration
         if self.explore_type == 'frontier':
-            self.freq = 5  # [Hz]
             self.create_timer(1.0 / self.freq, self.frontier_timer_cb)
         elif self.explore_type == 'random':
-            self.freq = 5  # [Hz]
             self.create_timer(1.0 / self.freq, self.random_timer_cb)
         else:
             self.get_logger().error(
@@ -71,8 +70,9 @@ class Explore(Node):
         )
 
     def random_timer_cb(self):
+        self.update_robot_pose()
         # Randomly select a location for the robot to travel to
-        if self.saved_map is None:
+        if self.saved_map is None or self.robot_pose is None:
             self.get_logger().info('No Map Received Yet', once=True)
             return
         # Get map information
@@ -96,6 +96,41 @@ class Explore(Node):
                 goal_pose = Pose()
                 goal_pose.position.x = random_x
                 goal_pose.position.y = random_y
+                self.send_robot(goal_pose)
+        else:
+            self.get_logger().info('First Random Goal Pose', once=True)
+            # Current goal is None for first goal
+            random_x = random.random() * map_width * map_resolution + map_origin_x
+            random_y = random.random() * map_height * map_resolution + map_origin_y
+            goal_pose = Pose()
+            goal_pose.position.x = random_x
+            goal_pose.position.y = random_y
+            self.send_robot(goal_pose)
+        # Check if the robot is moving and if not
+        # we need to select a new goal pose
+        self.get_logger().info(
+            f'Robot Unmoving Count: {self.robot_unmoving_count}' +
+            ' Checking if robot is moving...'
+        )
+        distance = np.sqrt(
+            (self.robot_pose.position.x - self.prev_robot_pose.position.x) ** 2 +
+            (self.robot_pose.position.y -
+                self.prev_robot_pose.position.y) ** 2
+        )
+        if distance <= 0.1:
+            self.robot_unmoving_count += 1
+        if self.robot_unmoving_count >= self.goal_failed_threshold:
+            self.get_logger().warn(
+                'Robot Failed to Move ' +
+                f'{self.robot_unmoving_count} Times'
+            )
+            self.robot_unmoving_count = 0
+            random_x = random.random() * map_width * map_resolution + map_origin_x
+            random_y = random.random() * map_height * map_resolution + map_origin_y
+            goal_pose = Pose()
+            goal_pose.position.x = random_x
+            goal_pose.position.y = random_y
+            self.send_robot(goal_pose)
 
     def frontier_timer_cb(self):
         # Get the transform from the map to the robot and save it
@@ -222,6 +257,15 @@ class Explore(Node):
     def map_callback(self, msg):
         self.saved_map = msg
 
+    def robot_is_moving(self):
+        if self.robot_pose is None or self.prev_robot_pose is None:
+            return False
+        distance = np.sqrt(
+            (self.robot_pose.position.x - self.prev_robot_pose.position.x) ** 2 +
+            (self.robot_pose.position.y - self.prev_robot_pose.position.y) ** 2
+        )
+        return distance > 0.1
+
     def send_robot(self, pose: Pose):
         # Check if the robot is travelling towards the goal pose
         goal_pose_msg = PoseStamped()
@@ -236,7 +280,9 @@ class Explore(Node):
         # Update the current goal pose
         self.current_goal = pose
 
-    def robot_at_goal(self, epsilon: float = 0.5) -> bool:
+    def robot_at_goal(self, epsilon: float = 0.1) -> bool:
+        if self.robot_pose is None or self.current_goal is None:
+            return False
         robot_x = self.robot_pose.position.x
         robot_y = self.robot_pose.position.y
         goal_x = self.current_goal.position.x
