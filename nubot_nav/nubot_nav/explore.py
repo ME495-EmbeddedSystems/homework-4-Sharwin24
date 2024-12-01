@@ -5,8 +5,7 @@ from geometry_msgs.msg import PoseStamped, Pose
 import numpy as np
 from visualization_msgs.msg import MarkerArray, Marker
 from tf2_ros import Buffer, TransformListener
-from enum import Enum, auto
-
+import random
 from nubot_nav.frontier import Frontier, FrontierUnion
 
 
@@ -24,15 +23,21 @@ class Explore(Node):
         super().__init__('explore')
         self.get_logger().info('Explore Node Started')
 
+        # Parameter "explore_type"
+        self.explore_type = self.declare_parameter(
+            'explore_type', 'frontier'
+        ).value
+
         self.map_sub = self.create_subscription(
             OccupancyGrid, '/map', self.map_callback, 10
         )
         self.pose_pub = self.create_publisher(
             PoseStamped, '/goal_pose', 10
         )
-        self.frontier_pub = self.create_publisher(
-            MarkerArray, '/explore/frontiers', 10
-        )
+        if self.explore_type == 'frontier':
+            self.frontier_pub = self.create_publisher(
+                MarkerArray, '/explore/frontiers', 10
+            )
 
         # Setup a Transform Listener
         self.buffer = Buffer()
@@ -46,14 +51,53 @@ class Explore(Node):
         self.current_goal: Pose = None
         # How many times we need to publish a goal pose without the robot moving
         # to deem it a rejected goal
-        self.goal_failed_threshold = 5
+        self.goal_failed_threshold = 15
         self.robot_unmoving_count = 0
 
         # Timer for frontier exploration
-        self.freq = 5  # [Hz]
-        self.create_timer(1.0 / self.freq, self.timer_callback)
+        if self.explore_type == 'frontier':
+            self.freq = 5  # [Hz]
+            self.create_timer(1.0 / self.freq, self.frontier_timer_cb)
+        elif self.explore_type == 'random':
+            self.freq = 5  # [Hz]
+            self.create_timer(1.0 / self.freq, self.random_timer_cb)
+        else:
+            self.get_logger().error(
+                f'Invalid Explore Type: {self.explore_type}'
+            )
+        self.get_logger().info(
+            f'Exploring at {self.freq} Hz using ' +
+            f'{self.explore_type} algorithm'
+        )
 
-    def timer_callback(self):
+    def random_timer_cb(self):
+        # Randomly select a location for the robot to travel to
+        if self.saved_map is None:
+            self.get_logger().info('No Map Received Yet', once=True)
+            return
+        # Get map information
+        map_width = self.saved_map.info.width
+        map_height = self.saved_map.info.height
+        map_resolution = self.saved_map.info.resolution
+        map_origin_x = self.saved_map.info.origin.position.x
+        map_origin_y = self.saved_map.info.origin.position.y
+        if self.current_goal is not None:
+            # If we're traveling to a goal pose,
+            # check if we've reached it before
+            # sending to a new random goal pose
+            if self.robot_at_goal():
+                self.get_logger().info(
+                    'Robot Reached Goal Pose: ' +
+                    f'({self.current_goal.position.x:.3f}, ' +
+                    f'{self.current_goal.position.y:.3f})'
+                )
+                random_x = random.random() * map_width * map_resolution + map_origin_x
+                random_y = random.random() * map_height * map_resolution + map_origin_y
+                goal_pose = Pose()
+                goal_pose.position.x = random_x
+                goal_pose.position.y = random_y
+
+    def frontier_timer_cb(self):
         # Get the transform from the map to the robot and save it
         self.update_robot_pose()
         # Run a Frontier Exploration Algorithm
@@ -127,6 +171,10 @@ class Explore(Node):
             else:
                 # Check if the robot is moving and if not
                 # we need to select a new goal pose
+                self.get_logger().info(
+                    f'Robot Unmoving Count: {self.robot_unmoving_count}' +
+                    ' Checking if robot is moving...'
+                )
                 distance = np.sqrt(
                     (self.robot_pose.position.x - self.prev_robot_pose.position.x) ** 2 +
                     (self.robot_pose.position.y -
@@ -141,6 +189,8 @@ class Explore(Node):
                     )
                     self.robot_unmoving_count = 0
                     latest_frontier = self.frontier_map.get_latest_frontier()
+                    # Delete the latest frontier
+                    self.frontier_map.remove_frontier(latest_frontier)
                     new_goal = self.generate_random_goal(latest_frontier)
                     self.send_robot(new_goal)
 

@@ -9,13 +9,14 @@ class Frontier:
     # -------------- Begin_Citation [2] --------------#
     id_iter = itertools.count()
 
-    def __init__(self, x, y, min_radius=3.0, max_radius=7.0):
+    def __init__(self, x, y, min_radius=5.0, max_radius=6.0):
         self.id = next(self.id_iter)
     # -------------- End_Citation [2] --------------#
         self.x = x
         self.y = y
         self.min_radius = min_radius
         self.max_radius = max_radius
+        self.explored = False
 
     def __eq__(self, value):
         if not isinstance(value, self.__class__):
@@ -27,6 +28,12 @@ class Frontier:
 
     def __repr__(self):
         return f'Frontier [{self.id}] centered at ({self.x}, {self.y})'
+
+    def visit(self):
+        self.explored = True
+
+    def unvisit(self):
+        self.explored = False
 
     def contains(self, x, y):
         # Check if the point (x, y) is within the "donut" frontier
@@ -62,13 +69,14 @@ class FrontierUnion:
         self.frontiers: set[Frontier] = set()
 
     def add_frontier(self, frontier: Frontier):
+        frontier.visit()
         self.frontiers.add(frontier)
 
     def remove_frontier(self, frontier: Frontier):
+        frontier.unvisit()
         self.frontiers.remove(frontier)
 
     def get_latest_frontier(self):
-        # Delete the frontier with the highest ID
         return max(self.frontiers, key=lambda frontier: frontier.id)
 
     def is_empty(self) -> bool:
