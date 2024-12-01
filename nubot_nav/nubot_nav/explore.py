@@ -1,3 +1,4 @@
+import math
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid
@@ -51,8 +52,8 @@ class Explore(Node):
         self.current_goal: Pose = None
         # How many times we need to publish a goal pose without the robot moving
         # to deem it a rejected goal
-        self.goal_failed_threshold = 5
         self.robot_unmoving_count = 0
+        self.goal_failed_threshold = 25
 
         self.freq = 100  # [Hz]
         # Timer for frontier exploration
@@ -72,7 +73,7 @@ class Explore(Node):
     def random_timer_cb(self):
         self.update_robot_pose()
         # Randomly select a location for the robot to travel to
-        if self.saved_map is None or self.robot_pose is None:
+        if self.saved_map is None or self.prev_robot_pose is None:
             self.get_logger().info('No Map Received Yet', once=True)
             return
         # Get map information
@@ -96,6 +97,7 @@ class Explore(Node):
                 goal_pose = Pose()
                 goal_pose.position.x = random_x
                 goal_pose.position.y = random_y
+                goal_pose.orientation = self.current_goal.orientation
                 self.send_robot(goal_pose)
         else:
             self.get_logger().info('First Random Goal Pose', once=True)
@@ -105,20 +107,15 @@ class Explore(Node):
             goal_pose = Pose()
             goal_pose.position.x = random_x
             goal_pose.position.y = random_y
+            goal_pose.orientation = self.robot_pose.orientation
             self.send_robot(goal_pose)
         # Check if the robot is moving and if not
         # we need to select a new goal pose
-        self.get_logger().info(
-            f'Robot Unmoving Count: {self.robot_unmoving_count}' +
-            ' Checking if robot is moving...'
-        )
-        distance = np.sqrt(
-            (self.robot_pose.position.x - self.prev_robot_pose.position.x) ** 2 +
-            (self.robot_pose.position.y -
-                self.prev_robot_pose.position.y) ** 2
-        )
-        if distance <= 0.1:
+        if not self.robot_is_moving():
             self.robot_unmoving_count += 1
+            self.get_logger().info(
+                f'Robot Unmoving Count: {self.robot_unmoving_count}'
+            )
         if self.robot_unmoving_count >= self.goal_failed_threshold:
             self.get_logger().warn(
                 'Robot Failed to Move ' +
@@ -136,7 +133,7 @@ class Explore(Node):
         # Get the transform from the map to the robot and save it
         self.update_robot_pose()
         # Run a Frontier Exploration Algorithm
-        if self.saved_map is None or self.robot_pose is None:
+        if self.saved_map is None or self.prev_robot_pose is None:
             self.get_logger().info('No Map Received Yet', once=True)
             return
         elif self.frontier_map.is_empty():
@@ -156,8 +153,7 @@ class Explore(Node):
 
             # Visualize the first frontier
             frontier_markers = MarkerArray(
-                markers=[self.get_frontier_marker(
-                    first_frontier, new=True, first=True)]
+                markers=[self.get_frontier_marker(first_frontier)]
             )
             self.frontier_pub.publish(frontier_markers)
 
@@ -198,7 +194,7 @@ class Explore(Node):
                 )
                 # Visualize the new frontier
                 frontier_markers.markers.append(
-                    self.get_frontier_marker(new_frontier, new=True)
+                    self.get_frontier_marker(new_frontier)
                 )
                 self.frontier_pub.publish(frontier_markers)
                 self.frontier_map.add_frontier(new_frontier)
@@ -214,7 +210,7 @@ class Explore(Node):
             (self.robot_pose.position.y -
                 self.prev_robot_pose.position.y) ** 2
         )
-        if distance <= 0.1:
+        if distance <= 0.0001:
             self.robot_unmoving_count += 1
         if self.robot_unmoving_count >= self.goal_failed_threshold:
             self.get_logger().warn(
@@ -256,14 +252,59 @@ class Explore(Node):
     def map_callback(self, msg):
         self.saved_map = msg
 
+    def pick_random_goal(self):
+        random_x = random.random() * self.saved_map.info.width * \
+            self.saved_map.info.resolution + self.saved_map.info.origin.position.x
+        random_y = random.random() * self.saved_map.info.height * \
+            self.saved_map.info.resolution + self.saved_map.info.origin.position.y
+        while not self.is_goal_valid(random_x, random_y):
+            random_x = random.random() * self.saved_map.info.width * \
+                self.saved_map.info.resolution + self.saved_map.info.origin.position.x
+            random_y = random.random() * self.saved_map.info.height * \
+                self.saved_map.info.resolution + self.saved_map.info.origin.position.y
+        goal_pose = Pose()
+        goal_pose.position.x = random_x
+        goal_pose.position.y = random_y
+        goal_pose.orientation = self.robot_pose.orientation
+        return goal_pose
+
+    def is_goal_valid(self, x, y):
+        map_data = np.array(self.saved_map.data).reshape(
+            self.saved_map.info.height, self.saved_map.info.width
+        )
+        map_x = int((x - self.saved_map.info.origin.position.x) /
+                    self.saved_map.info.resolution)
+        map_y = int((y - self.saved_map.info.origin.position.y) /
+                    self.saved_map.info.resolution)
+        if 0 <= map_x < map_data.shape[1] and 0 <= map_y < map_data.shape[0]:
+            # Free space is usually marked as 0 in occupancy grids
+            return map_data[map_y, map_x] == 0
+        return False
+
     def robot_is_moving(self):
         if self.robot_pose is None or self.prev_robot_pose is None:
             return False
+
         distance = np.sqrt(
             (self.robot_pose.position.x - self.prev_robot_pose.position.x) ** 2 +
             (self.robot_pose.position.y - self.prev_robot_pose.position.y) ** 2
         )
-        return distance > 0.1
+
+        # Calculate the angular difference between current and previous orientations
+        def quat2yaw(quaternion):
+            return math.atan2(2.0 * (quaternion.w * quaternion.z),
+                              1.0 - 2.0 * (quaternion.z ** 2))
+
+        current_yaw = quat2yaw(self.robot_pose.orientation)
+        prev_yaw = quat2yaw(self.prev_robot_pose.orientation)
+        orientation_diff = abs(current_yaw - prev_yaw)
+
+        # Normalize orientation difference to the range [0, pi]
+        orientation_diff = min(orientation_diff, 2 *
+                               math.pi - orientation_diff)
+
+        # Check if the robot has moved (position or orientation)
+        return distance > 0.01 or orientation_diff > 0.05
 
     def send_robot(self, pose: Pose):
         # Check if the robot is travelling towards the goal pose
@@ -320,7 +361,7 @@ class Explore(Node):
             marker.color.r = 1.0
             marker.color.g = 0.0
             marker.color.b = 0.0
-        marker.color.a = 0.5
+        marker.color.a = 0.25
         return marker
 
 
