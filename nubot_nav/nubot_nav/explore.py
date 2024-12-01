@@ -92,23 +92,11 @@ class Explore(Node):
                     f'({self.current_goal.position.x:.3f}, ' +
                     f'{self.current_goal.position.y:.3f})'
                 )
-                random_x = random.random() * map_width * map_resolution + map_origin_x
-                random_y = random.random() * map_height * map_resolution + map_origin_y
-                goal_pose = Pose()
-                goal_pose.position.x = random_x
-                goal_pose.position.y = random_y
-                goal_pose.orientation = self.current_goal.orientation
-                self.send_robot(goal_pose)
+                self.send_robot(self.random_goal_pose())
         else:
             self.get_logger().info('First Random Goal Pose', once=True)
             # Current goal is None for first goal
-            random_x = random.random() * map_width * map_resolution + map_origin_x
-            random_y = random.random() * map_height * map_resolution + map_origin_y
-            goal_pose = Pose()
-            goal_pose.position.x = random_x
-            goal_pose.position.y = random_y
-            goal_pose.orientation = self.robot_pose.orientation
-            self.send_robot(goal_pose)
+            self.send_robot(self.random_goal_pose())
         # Check if the robot is moving and if not
         # we need to select a new goal pose
         if not self.robot_is_moving():
@@ -122,12 +110,7 @@ class Explore(Node):
                 f'{self.robot_unmoving_count} Times'
             )
             self.robot_unmoving_count = 0
-            random_x = random.random() * map_width * map_resolution + map_origin_x
-            random_y = random.random() * map_height * map_resolution + map_origin_y
-            goal_pose = Pose()
-            goal_pose.position.x = random_x
-            goal_pose.position.y = random_y
-            self.send_robot(goal_pose)
+            self.send_robot(self.random_goal_pose())
 
     def frontier_timer_cb(self):
         # Get the transform from the map to the robot and save it
@@ -252,7 +235,7 @@ class Explore(Node):
     def map_callback(self, msg):
         self.saved_map = msg
 
-    def pick_random_goal(self):
+    def random_goal_pose(self):
         random_x = random.random() * self.saved_map.info.width * \
             self.saved_map.info.resolution + self.saved_map.info.origin.position.x
         random_y = random.random() * self.saved_map.info.height * \
