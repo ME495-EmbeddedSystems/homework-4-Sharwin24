@@ -54,7 +54,7 @@ class Explore(Node):
         self.goal_failed_threshold = 5
         self.robot_unmoving_count = 0
 
-        self.freq = 10  # [Hz]
+        self.freq = 100  # [Hz]
         # Timer for frontier exploration
         if self.explore_type == 'frontier':
             self.create_timer(1.0 / self.freq, self.frontier_timer_cb)
