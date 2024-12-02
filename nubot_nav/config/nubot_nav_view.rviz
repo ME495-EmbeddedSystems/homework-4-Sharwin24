@@ -245,7 +245,7 @@ Visualization Manager:
       Enabled: true
       Name: GoalPose
       Namespaces:
-        goal_pose: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -280,6 +280,50 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /plan
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        base_footprint:
+          Value: true
+        base_laser:
+          Value: true
+        base_link:
+          Value: true
+        caster:
+          Value: true
+        left_wheel:
+          Value: true
+        map:
+          Value: true
+        odom:
+          Value: true
+        right_wheel:
+          Value: true
+      Marker Scale: 3
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        map:
+          odom:
+            base_link:
+              base_footprint:
+                {}
+              base_laser:
+                {}
+              caster:
+                {}
+              left_wheel:
+                {}
+              right_wheel:
+                {}
+      Update Interval: 0
       Value: true
   Enabled: true
   Global Options:
@@ -327,25 +371,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 37.682586669921875
+      Distance: 16.861989974975586
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: -0.7641473412513733
+        Y: -0.5957512855529785
+        Z: -0.5473235845565796
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6397969722747803
+      Pitch: 0.6547969579696655
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.7804131507873535
+      Yaw: 2.4704153537750244
     Saved: ~
 Window Geometry:
   Displays:

@@ -52,7 +52,7 @@ class Explore(Node):
 
         # Robot Pose and Map
         self.prev_robot_pose: Pose = None
-        self.robot_pose: Pose = None
+        self.robot_pose: Pose = None  # map -> base_link
         self.saved_map: OccupancyGrid = None
         self.frontier_map = FrontierUnion()
         self.current_goal: Pose = None
@@ -71,10 +71,14 @@ class Explore(Node):
             self.get_logger().error(
                 f'Invalid Explore Type: {self.explore_type}'
             )
+            self.create_timer(1.0 / self.freq, self.telemetry_cb)
         self.get_logger().info(
             f'Exploring at {self.freq} Hz using ' +
             f'{self.explore_type} algorithm'
         )
+
+    def telemetry_cb(self):
+        self.update_robot_pose()
 
     def random_timer_cb(self):
         self.update_robot_pose()
@@ -151,7 +155,7 @@ class Explore(Node):
             self.frontier_pub.publish(frontier_markers)
 
             # Pick a random point from the frontier
-            goal_pose = first_frontier.random_pose_cart()
+            goal_pose = self.frontier_random_goal(first_frontier)
 
             # Publish the goal pose
             self.send_robot(goal_pose)
@@ -170,6 +174,10 @@ class Explore(Node):
                 if self.robot_pose is None:
                     self.get_logger().warn('No Robot Pose Received Yet')
                     return
+
+                # visit the latest frontier
+                latest_frontier = self.frontier_map.get_latest_frontier()
+                latest_frontier.visit()
 
                 # Create a new frontier here (Robot current's position)
                 new_frontier_x = self.robot_pose.position.x
@@ -199,7 +207,6 @@ class Explore(Node):
                 )
                 self.robot_unmoving_count = 0
                 latest_frontier = self.frontier_map.get_latest_frontier()
-                # Delete the latest frontier
                 self.frontier_map.remove_frontier(latest_frontier)
                 new_goal = self.frontier_random_goal(latest_frontier)
                 self.send_robot(new_goal)
@@ -210,9 +217,9 @@ class Explore(Node):
         map_to_robot = None
         try:
             map_to_robot = self.buffer.lookup_transform(
-                source_frame='map',
-                target_frame='base_link',
-                time=rclpy.time.Time()
+                source_frame='base_link',
+                target_frame='map',
+                time=rclpy.time.Time().to_msg()
             )
         except Exception as e:
             self.get_logger().warn(f'Failed to get transform: {e}')
@@ -228,7 +235,7 @@ class Explore(Node):
         self.robot_pose.orientation = map_to_robot.transform.rotation
         # self.get_logger().info(
         #     f'Robot Pose: ({self.robot_pose.position.x:.3f}, ' +
-        #     f'{self.robot_pose.position.y:.3f})'
+        #     f'{self.robot_pose.position.y:.3f})'l
         # )
 
     def map_callback(self, msg):
@@ -272,6 +279,12 @@ class Explore(Node):
         arrow.lifetime = rclpy.duration.Duration(seconds=20).to_msg()
         markers.markers = [goal, arrow]
         self.goal_marker_pub.publish(markers)
+        self.get_logger().info(
+            f'RobotPose: ({self.robot_pose.position.x:.3f}, ' +
+            f'{self.robot_pose.position.y:.3f}), ' +
+            'Goal Pose Received: ' +
+            f'({msg.pose.position.x:.3f}, {msg.pose.position.y:.3f})'
+        )
 
     def random_goal_pose(self):
         random_x = random.random() * self.saved_map.info.width * \
@@ -286,6 +299,7 @@ class Explore(Node):
         goal_pose = Pose()
         goal_pose.position.x = random_x
         goal_pose.position.y = random_y
+        goal_pose.position.z = self.robot_pose.position.z
         heading = np.arctan2(random_y - self.robot_pose.position.y,
                              random_x - self.robot_pose.position.x)
         goal_pose.orientation = self.yaw2quat(heading)
@@ -321,9 +335,6 @@ class Explore(Node):
         # Normalize orientation difference to the range [0, pi]
         orientation_diff = min(orientation_diff, 2 *
                                math.pi - orientation_diff)
-        # self.get_logger().info(
-        #     f'Dist Diff: {distance:.4f}, Ori Diff: {orientation_diff:.3f}'
-        # )
         return distance > 0.01 or orientation_diff > 0.01
 
     def send_robot(self, pose: Pose):
@@ -340,14 +351,20 @@ class Explore(Node):
         # Update the current goal pose
         self.current_goal = pose
 
-    def robot_at_goal(self, epsilon: float = 0.08) -> bool:
+    def robot_at_goal(self, epsilon: float = 0.5) -> bool:
         if self.robot_pose is None or self.current_goal is None:
             return False
         robot_x = self.robot_pose.position.x
         robot_y = self.robot_pose.position.y
         goal_x = self.current_goal.position.x
         goal_y = self.current_goal.position.y
-        return np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2) <= epsilon
+        distance = np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2)
+        self.get_logger().info(
+            f'Robot: ({robot_x:.3f}, {robot_y:.3f}), ' +
+            f'Goal: ({goal_x:.3f}, {goal_y:.3f})' +
+            f', Distance: {distance:.3f} <= {epsilon}'
+        )
+        return distance <= epsilon
 
     def frontier_random_goal(self, new_frontier: Frontier) -> Pose:
         new_goal = new_frontier.random_pose_polar()
@@ -367,8 +384,8 @@ class Explore(Node):
         marker.pose.position.x = frontier.x
         marker.pose.position.y = frontier.y
         marker.pose.position.z = 0.0
-        marker.scale.x = 2*frontier.max_radius
-        marker.scale.y = 2*frontier.max_radius
+        marker.scale.x = 2.0 * frontier.max_radius
+        marker.scale.y = 2.0 * frontier.max_radius
         marker.scale.z = 0.15
         if frontier.id == 0:
             marker.color.r = 0.0
@@ -382,12 +399,16 @@ class Explore(Node):
             marker.color.r = 1.0
             marker.color.g = 0.0
             marker.color.b = 0.0
-        marker.color.a = 0.35
+        marker.color.a = 0.4
         return marker
 
     def yaw2quat(self, yaw: float):
         """
         Convert a yaw angle (in radians) to a quaternion.
+
+        :param yaw: The yaw angle [rad]
+        :paramtype yaw: float
+        :return: The quaternion representing the yaw angle
         """
         return Quaternion(
             x=0.0,
@@ -396,7 +417,7 @@ class Explore(Node):
             w=math.cos(yaw / 2.0)
         )
 
-    def quat2yaw(self, quaternion):
+    def quat2yaw(self, quaternion: Quaternion):
         return math.atan2(2.0 * (quaternion.w * quaternion.z),
                           1.0 - 2.0 * (quaternion.z ** 2))
 

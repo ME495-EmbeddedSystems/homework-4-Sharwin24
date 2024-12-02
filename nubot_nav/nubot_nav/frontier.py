@@ -9,13 +9,13 @@ class Frontier:
     # -------------- Begin_Citation [2] --------------#
     id_iter = itertools.count()
 
-    def __init__(self, x, y, min_radius=3.0, max_radius=5.0):
+    def __init__(self, x: float, y: float):
         self.id = next(self.id_iter)
     # -------------- End_Citation [2] --------------#
         self.x = x
         self.y = y
-        self.min_radius = min_radius
-        self.max_radius = max_radius
+        self.min_radius = 3.0
+        self.max_radius = 5.0
         self.explored = False
 
     def __eq__(self, value):
@@ -51,6 +51,7 @@ class Frontier:
         while not self.contains(rand_x, rand_y):
             rand_x = random.random() * 2 * self.max_radius + self.x - self.max_radius
             rand_y = random.random() * 2 * self.max_radius + self.y - self.max_radius
+        # This pose is in the frame of the frontier, so we need to transform it to the map frame
         random_pose.position.x = rand_x
         random_pose.position.y = rand_y
         # Select an orientation that points away from the center
@@ -92,11 +93,9 @@ class FrontierUnion:
         self.frontiers: set[Frontier] = set()
 
     def add_frontier(self, frontier: Frontier):
-        frontier.visit()
         self.frontiers.add(frontier)
 
     def remove_frontier(self, frontier: Frontier):
-        frontier.unvisit()
         self.frontiers.remove(frontier)
 
     def get_latest_frontier(self):
