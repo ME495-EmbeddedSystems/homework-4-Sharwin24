@@ -1,3 +1,4 @@
+"""Setup the nubot_nav package."""
 from setuptools import find_packages, setup
 
 package_name = 'nubot_nav'

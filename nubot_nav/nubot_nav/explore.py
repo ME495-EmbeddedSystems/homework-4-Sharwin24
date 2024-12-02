@@ -1,50 +1,59 @@
-import math
+"""
+Runs an exploration algorithm using nav2 and the slam_toolbox.
+
+Publishers
+    + /explore/goal_pose_marker (visualization_msgs.msg.MarkerArray) - Visualizing the goal pose.
+    + /explore/frontiers (visualization_msgs.msg.MarkerArray) - Visualizing the frontiers.
+    + /goal_pose (geometry_msgs.msg.PoseStamped) - The goal pose for the robot.
+
+Subscribers
+    + /goal_pose (geometry_msgs.msg.PoseStamped) - The goal pose for the robot, for visualizing.
+    + /map (nav_msgs.msg.OccupancyGrid) - The map for exploration.
+
+Parameters
+----------
+    + explore_type (str) - The exploration algorithm to use. [frontier, random]
+
+"""
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid
-from geometry_msgs.msg import PoseStamped, Pose, Quaternion
-import numpy as np
-from visualization_msgs.msg import MarkerArray, Marker
+from geometry_msgs.msg import Pose, PoseStamped, Quaternion
+from visualization_msgs.msg import Marker, MarkerArray
 from tf2_ros import Buffer, TransformListener
-import random
 from nubot_nav.frontier import Frontier, FrontierUnion
-
-
-# Frontier Algorithm:
-# Establish every visible point within some distance threshold as part of a frontier
-# Use both a minimum and maximum distance threshold to define a "donut" frontier.
-# Then select a random point in the frontier and set it as the goal_pose
-# If the robot fails to move/navigate, then select a new point in the frontier.
-# Next repeat this process but select a point in the new frontier that is not
-# in the union of all of the created frontiers.
+import math
+import numpy as np
+import random
 
 
 class Explore(Node):
+    """Exploration Node for a diff-drive robot."""
+
     def __init__(self):
+        """Initialize the Explore Node."""
         super().__init__('explore')
         self.get_logger().info('Explore Node Started')
 
-        # Parameter "explore_type"
+        # ROS Parameters, Publishers, and Subscribers
         self.explore_type = self.declare_parameter(
             'explore_type', 'frontier'
         ).value
-
-        self.map_sub = self.create_subscription(
-            OccupancyGrid, '/map', self.map_callback, 10
-        )
         self.pose_pub = self.create_publisher(
             PoseStamped, '/goal_pose', 10
-        )
-        self.goal_pose_sub = self.create_subscription(
-            PoseStamped, '/goal_pose', self.goal_pose_callback, 10
         )
         self.goal_marker_pub = self.create_publisher(
             MarkerArray, '/explore/goal_pose_marker', 10
         )
-        if self.explore_type == 'frontier':
-            self.frontier_pub = self.create_publisher(
-                MarkerArray, '/explore/frontiers', 10
-            )
+        self.frontier_pub = self.create_publisher(
+            MarkerArray, '/explore/frontiers', 10
+        )
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, '/map', self.map_callback, 10
+        )
+        self.goal_pose_sub = self.create_subscription(
+            PoseStamped, '/goal_pose', self.goal_pose_callback, 10
+        )
 
         # Setup a Transform Listener
         self.buffer = Buffer()
@@ -59,7 +68,7 @@ class Explore(Node):
         # How many times we need to publish a goal pose without the robot moving
         # to deem it a rejected goal
         self.robot_unmoving_count = 0
-        self.goal_failed_threshold = 500
+        self.goal_failed_threshold = 500  # This is about 5 seconds at 100 Hz
 
         self.freq = 100  # [Hz]
         # Timer for frontier exploration
@@ -78,9 +87,11 @@ class Explore(Node):
         )
 
     def telemetry_cb(self):
+        """Update the robot's pose so we can debug this node."""
         self.update_robot_pose()
 
     def random_timer_cb(self):
+        """Run a random exploration algorithm."""
         self.update_robot_pose()
         # Randomly select a location for the robot to travel to
         if self.saved_map is None or self.prev_robot_pose is None:
@@ -111,8 +122,7 @@ class Explore(Node):
                 f'({first_goal.position.x:.3f}, {first_goal.position.y:.3f})'
             )
             self.send_robot(first_goal)
-        # Check if the robot is moving and if not
-        # we need to select a new goal pose
+        # If the robot is not moving for a while, reselect a random goal
         if not self.robot_is_moving():
             self.robot_unmoving_count += 1
             if self.robot_unmoving_count >= self.goal_failed_threshold:
@@ -127,6 +137,7 @@ class Explore(Node):
             self.robot_unmoving_count = 0
 
     def frontier_timer_cb(self):
+        """Run a frontier exploration algorithm."""
         # Get the transform from the map to the robot and save it
         self.update_robot_pose()
         # Run a Frontier Exploration Algorithm
@@ -139,7 +150,7 @@ class Explore(Node):
             robot_x = self.robot_pose.position.x
             robot_y = self.robot_pose.position.y
 
-            # Create a frontier at the map's origin since it is the first frontier
+            # Create the first frontier at the robot's position
             first_frontier = Frontier(robot_x, robot_y)
 
             # Add the frontier to the frontier union
@@ -168,7 +179,7 @@ class Explore(Node):
                 )
 
                 # visit the latest frontier
-                latest_frontier = self.frontier_map.get_latest_frontier()
+                latest_frontier = self.frontier_map.get_latest()
                 latest_frontier.visit()
 
                 # Create a new frontier here (Robot current's position)
@@ -179,7 +190,7 @@ class Explore(Node):
                 # Select a random pose from the new frontier
                 # that isn't already in our Union of frontiers
                 new_goal = self.frontier_random_goal(new_frontier)
-                # After we've found our new goal, we can add the frontier to the union
+
                 # Visualize the frontiers
                 self.frontier_map.add_frontier(new_frontier)
                 frontier_markers = MarkerArray(
@@ -188,7 +199,7 @@ class Explore(Node):
                 )
                 self.frontier_pub.publish(frontier_markers)
                 self.send_robot(new_goal)
-
+        # If the robot is not moving for a while, reselect the last frontier
         if not self.robot_is_moving():
             self.robot_unmoving_count += 1
             if self.robot_unmoving_count >= self.goal_failed_threshold:
@@ -198,45 +209,31 @@ class Explore(Node):
                 )
                 self.robot_unmoving_count = 0
                 self.frontier_map.remove_frontier(
-                    self.frontier_map.get_latest_frontier()
+                    self.frontier_map.get_latest()
                 )
                 new_goal = self.frontier_random_goal(
-                    self.frontier_map.get_latest_frontier()
+                    self.frontier_map.get_latest()
                 )
                 self.send_robot(new_goal)
         else:
             self.robot_unmoving_count = 0
 
-    def update_robot_pose(self):
-        map_to_robot = None
-        try:
-            map_to_robot = self.buffer.lookup_transform(
-                source_frame='base_link',
-                target_frame='map',
-                time=rclpy.time.Time().to_msg()
-            )
-        except Exception as e:
-            self.get_logger().warn(f'Failed to get transform: {e}')
-            return
-        if map_to_robot is None:
-            self.get_logger().warn('No Transform Received')
-            return
-        self.prev_robot_pose = self.robot_pose
-        self.robot_pose = Pose()
-        self.robot_pose.position.x = map_to_robot.transform.translation.x
-        self.robot_pose.position.y = map_to_robot.transform.translation.y
-        self.robot_pose.position.z = map_to_robot.transform.translation.z
-        self.robot_pose.orientation = map_to_robot.transform.rotation
-        # self.get_logger().info(
-        #     f'Robot Pose: ({self.robot_pose.position.x:.3f}, ' +
-        #     f'{self.robot_pose.position.y:.3f})'l
-        # )
+    def map_callback(self, msg: OccupancyGrid):
+        """
+        Save the map for navigation.
 
-    def map_callback(self, msg):
+        :param msg: The map as an OccupancyGrid
+        :type msg: OccupancyGrid
+        """
         self.saved_map = msg
 
     def goal_pose_callback(self, msg: PoseStamped):
-        # sphere at Goal
+        """
+        Subscribe to the goal_pose topic and visualize it with an arrow.
+
+        :param msg: The goal pose message
+        :type msg: PoseStamped
+        """
         markers = MarkerArray()
         goal = Marker()
         goal.header.frame_id = 'map'
@@ -253,8 +250,8 @@ class Explore(Node):
         goal.color.g = 0.0
         goal.color.b = 0.0
         goal.color.a = 0.5
+        # Clear the arrow after some time
         goal.lifetime = rclpy.duration.Duration(seconds=20).to_msg()
-        # Draw an arrow in the direction of the goal (using its orientation)
         arrow = Marker()
         arrow.header.frame_id = 'map'
         arrow.header.stamp = self.get_clock().now().to_msg()
@@ -274,7 +271,35 @@ class Explore(Node):
         markers.markers = [goal, arrow]
         self.goal_marker_pub.publish(markers)
 
-    def random_goal_pose(self):
+    def update_robot_pose(self):
+        """Update the robot's pose using a transform from the map to the robot."""
+        map_to_robot = None
+        try:
+            map_to_robot = self.buffer.lookup_transform(
+                source_frame='base_link',
+                target_frame='map',
+                time=rclpy.time.Time().to_msg()
+            )
+        except Exception as e:
+            self.get_logger().warn(f'Failed to get transform: {e}')
+            return
+        if map_to_robot is None:
+            self.get_logger().warn('No Transform Received')
+            return
+        self.prev_robot_pose = self.robot_pose
+        self.robot_pose = Pose()
+        self.robot_pose.position.x = map_to_robot.transform.translation.x
+        self.robot_pose.position.y = map_to_robot.transform.translation.y
+        self.robot_pose.position.z = map_to_robot.transform.translation.z
+        self.robot_pose.orientation = map_to_robot.transform.rotation
+
+    def random_goal_pose(self) -> Pose:
+        """
+        Generate a valid random goal pose. Orientation is derived from the current robot pose.
+
+        :return: A random goal pose
+        :rtype: Pose
+        """
         random_x = random.random() * self.saved_map.info.width * \
             self.saved_map.info.resolution + self.saved_map.info.origin.position.x
         random_y = random.random() * self.saved_map.info.height * \
@@ -293,7 +318,17 @@ class Explore(Node):
         goal_pose.orientation = self.yaw2quat(heading)
         return goal_pose
 
-    def is_goal_valid(self, x, y):
+    def is_goal_valid(self, x: float, y: float) -> bool:
+        """
+        Given a position, determine if it is a valid goal position within the occupancy grid.
+
+        :param x: The x-coordinate of the goal position
+        :type x: float
+        :param y: The y-coordinate of the goal position
+        :type y: float
+        :return: True if the point is marked as free in the occupancy grid, False otherwise
+        :rtype: bool
+        """
         map_data = np.array(self.saved_map.data).reshape(
             self.saved_map.info.height, self.saved_map.info.width
         )
@@ -302,11 +337,17 @@ class Explore(Node):
         map_y = int((y - self.saved_map.info.origin.position.y) /
                     self.saved_map.info.resolution)
         if 0 <= map_x < map_data.shape[1] and 0 <= map_y < map_data.shape[0]:
-            # Free space is usually marked as 0 in occupancy grids
+            # Free space is 0
             return map_data[map_y, map_x] == 0
         return False
 
-    def robot_is_moving(self):
+    def robot_is_moving(self) -> bool:
+        """
+        Determine if the robot is moving by comparing the current and previous poses.
+
+        :return: True if the robot is moving, False otherwise
+        :rtype: bool
+        """
         if self.robot_pose is None or self.prev_robot_pose is None:
             return False
 
@@ -326,7 +367,12 @@ class Explore(Node):
         return distance > 0.001 or orientation_diff > 0.001
 
     def send_robot(self, pose: Pose):
-        # Check if the robot is travelling towards the goal pose
+        """
+        Send the robot to the given pose by publishing to goal_pose.
+
+        :param pose: The pose to send the robot to
+        :type pose: Pose
+        """
         goal_pose_msg = PoseStamped()
         goal_pose_msg.pose = pose
         goal_pose_msg.header.frame_id = 'map'
@@ -340,6 +386,14 @@ class Explore(Node):
         self.current_goal = pose
 
     def robot_at_goal(self, epsilon: float = 0.75) -> bool:
+        """
+        Determine if the robot is at the current goal within some epsilon.
+
+        :param epsilon: The tolerance for the distance function, defaults to 0.75
+        :type epsilon: float, optional
+        :return: True if the robot is at the goal, False otherwise
+        :rtype: bool
+        """
         if self.robot_pose is None or self.current_goal is None:
             return False
         robot_x = self.robot_pose.position.x
@@ -347,14 +401,21 @@ class Explore(Node):
         goal_x = self.current_goal.position.x
         goal_y = self.current_goal.position.y
         distance = np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2)
-        # self.get_logger().info(
-        #     f'Robot: ({robot_x:.3f}, {robot_y:.3f}), ' +
-        #     f'Goal: ({goal_x:.3f}, {goal_y:.3f})' +
-        #     f', Distance: {distance:.3f} <= {epsilon}'
-        # )
         return distance <= epsilon
 
     def frontier_random_goal(self, new_frontier: Frontier) -> Pose:
+        """
+        Given a new frontier, select a random goal pose within the frontier.
+
+        The selected goal pose is both valid (free in the occupancy grid) and
+        not in the union of frontiers. This should encourage the selection
+        of new areas to explore.
+
+        :param new_frontier: The new frontier to select a goal pose from
+        :type new_frontier: Frontier
+        :return: The goal pose generated from the frontier
+        :rtype: Pose
+        """
         new_goal = new_frontier.random_pose_polar()
         while self.frontier_map.in_union(new_goal.position.x, new_goal.position.y) and \
                 not self.is_goal_valid(new_goal.position.x, new_goal.position.y):
@@ -362,6 +423,14 @@ class Explore(Node):
         return new_goal
 
     def get_frontier_marker(self, frontier: Frontier) -> Marker:
+        """
+        Given a frontier, build a marker that represents it.
+
+        :param frontier: The frontier to visualize
+        :type frontier: Frontier
+        :return: The marker with the correct color and size of the frontier
+        :rtype: Marker
+        """
         marker = Marker()
         marker.header.frame_id = 'map'
         marker.header.stamp = self.get_clock().now().to_msg()
@@ -390,7 +459,7 @@ class Explore(Node):
         marker.color.a = 0.4
         return marker
 
-    def yaw2quat(self, yaw: float):
+    def yaw2quat(self, yaw: float) -> Quaternion:
         """
         Convert a yaw angle (in radians) to a quaternion.
 
@@ -405,12 +474,23 @@ class Explore(Node):
             w=math.cos(yaw / 2.0)
         )
 
-    def quat2yaw(self, quaternion: Quaternion):
-        return math.atan2(2.0 * (quaternion.w * quaternion.z),
-                          1.0 - 2.0 * (quaternion.z ** 2))
+    def quat2yaw(self, quaternion: Quaternion) -> float:
+        """
+        Convert a quaternion to a yaw angle (in radians).
+
+        :param quaternion: quaternion to convert
+        :type quaternion: Quaternion
+        :return: The yaw angle [rad]
+        :rtype: float
+        """
+        return math.atan2(
+            2.0 * (quaternion.w * quaternion.z),
+            1.0 - 2.0 * (quaternion.z ** 2)
+        )
 
 
 def main(args=None):
+    """Entry Point for the Explore Node."""
     rclpy.init(args=args)
     explore = Explore()
     rclpy.spin(explore)
