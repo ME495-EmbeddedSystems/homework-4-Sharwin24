@@ -2,7 +2,6 @@
   <arg name="world" default="$(find-pkg-share nubot)/worlds/nubot_world.sdf" description="World file to load"/>
   <!-- Start the nubot simulation -->
   <include file="$(find-pkg-share nubot)/launch/simulate.launch.xml">
-    <param name="use_sim_time" value="true"/>
     <arg name="use_rviz" value="False" />
     <arg name="world" value="$(var world)" />
   </include>
