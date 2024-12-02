@@ -1,3 +1,4 @@
+"""Test the frontier module."""
 import pytest
 from nubot_nav.frontier import Frontier, FrontierUnion
 # Copyright 2017 Open Source Robotics Foundation, Inc.
@@ -16,9 +17,13 @@ from nubot_nav.frontier import Frontier, FrontierUnion
 
 
 def test_contains():
+    """Test if contains method works."""
     frontier = Frontier(0, 0)
-    assert not frontier.contains(0, 0)
-    assert not frontier.contains(3, 0)
-    assert not frontier.contains(7, 0)
-    assert frontier.contains(3.5, 0)
-    assert frontier.contains(4, 0)
+    r_min = frontier.min_radius
+    r_max = frontier.max_radius
+    assert frontier.contains(0, 0)
+    assert frontier.contains(r_min, 0)
+    assert frontier.contains(r_max, 0)
+    assert frontier.contains(r_max - 0.5, 0)
+    assert frontier.contains(r_min + 0.5, 0)
+    assert frontier.contains(r_min + 0.1, r_min - 0.2)

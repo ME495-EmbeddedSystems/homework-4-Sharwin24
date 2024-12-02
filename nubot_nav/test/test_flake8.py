@@ -1,3 +1,4 @@
+"""Flake8 Tests."""
 # Copyright 2017 Open Source Robotics Foundation, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +20,8 @@ import pytest
 @pytest.mark.flake8
 @pytest.mark.linter
 def test_flake8():
-    rc, errors = main_with_errors(argv=[])
+    """Test for flake8 compliance."""
+    rc, errors = main_with_errors(argv=['--config', 'setup.cfg'])
     assert rc == 0, \
         'Found %d code style errors / warnings:\n' % len(errors) + \
         '\n'.join(errors)
