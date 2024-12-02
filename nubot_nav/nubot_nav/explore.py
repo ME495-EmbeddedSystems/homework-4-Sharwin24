@@ -136,9 +136,6 @@ class Explore(Node):
         elif self.frontier_map.is_empty():
             self.get_logger().info('Explore Node Received Map', once=True)
             # Get the robot's current position
-            if self.robot_pose is None:
-                self.get_logger().warn('No Robot Pose Received Yet')
-                return
             robot_x = self.robot_pose.position.x
             robot_y = self.robot_pose.position.y
 
@@ -169,11 +166,6 @@ class Explore(Node):
                     f'({self.current_goal.position.x:.3f}, ' +
                     f'{self.current_goal.position.y:.3f})'
                 )
-                # The robot is at the goal pose (or nearby)
-                # Get the robot's current position
-                if self.robot_pose is None:
-                    self.get_logger().warn('No Robot Pose Received Yet')
-                    return
 
                 # visit the latest frontier
                 latest_frontier = self.frontier_map.get_latest_frontier()
@@ -196,8 +188,7 @@ class Explore(Node):
                 )
                 self.frontier_pub.publish(frontier_markers)
                 self.send_robot(new_goal)
-        # Check if the robot is moving and if not
-        # we need to select a new goal pose
+
         if not self.robot_is_moving():
             self.robot_unmoving_count += 1
             if self.robot_unmoving_count >= self.goal_failed_threshold:
@@ -206,9 +197,12 @@ class Explore(Node):
                     f'{self.robot_unmoving_count} Times'
                 )
                 self.robot_unmoving_count = 0
-                latest_frontier = self.frontier_map.get_latest_frontier()
-                self.frontier_map.remove_frontier(latest_frontier)
-                new_goal = self.frontier_random_goal(latest_frontier)
+                self.frontier_map.remove_frontier(
+                    self.frontier_map.get_latest_frontier()
+                )
+                new_goal = self.frontier_random_goal(
+                    self.frontier_map.get_latest_frontier()
+                )
                 self.send_robot(new_goal)
         else:
             self.robot_unmoving_count = 0
@@ -279,12 +273,6 @@ class Explore(Node):
         arrow.lifetime = rclpy.duration.Duration(seconds=20).to_msg()
         markers.markers = [goal, arrow]
         self.goal_marker_pub.publish(markers)
-        self.get_logger().info(
-            f'RobotPose: ({self.robot_pose.position.x:.3f}, ' +
-            f'{self.robot_pose.position.y:.3f}), ' +
-            'Goal Pose Received: ' +
-            f'({msg.pose.position.x:.3f}, {msg.pose.position.y:.3f})'
-        )
 
     def random_goal_pose(self):
         random_x = random.random() * self.saved_map.info.width * \
@@ -335,7 +323,7 @@ class Explore(Node):
         # Normalize orientation difference to the range [0, pi]
         orientation_diff = min(orientation_diff, 2 *
                                math.pi - orientation_diff)
-        return distance > 0.01 or orientation_diff > 0.01
+        return distance > 0.001 or orientation_diff > 0.001
 
     def send_robot(self, pose: Pose):
         # Check if the robot is travelling towards the goal pose
@@ -351,7 +339,7 @@ class Explore(Node):
         # Update the current goal pose
         self.current_goal = pose
 
-    def robot_at_goal(self, epsilon: float = 0.5) -> bool:
+    def robot_at_goal(self, epsilon: float = 0.75) -> bool:
         if self.robot_pose is None or self.current_goal is None:
             return False
         robot_x = self.robot_pose.position.x
@@ -359,11 +347,11 @@ class Explore(Node):
         goal_x = self.current_goal.position.x
         goal_y = self.current_goal.position.y
         distance = np.sqrt((robot_x - goal_x) ** 2 + (robot_y - goal_y) ** 2)
-        self.get_logger().info(
-            f'Robot: ({robot_x:.3f}, {robot_y:.3f}), ' +
-            f'Goal: ({goal_x:.3f}, {goal_y:.3f})' +
-            f', Distance: {distance:.3f} <= {epsilon}'
-        )
+        # self.get_logger().info(
+        #     f'Robot: ({robot_x:.3f}, {robot_y:.3f}), ' +
+        #     f'Goal: ({goal_x:.3f}, {goal_y:.3f})' +
+        #     f', Distance: {distance:.3f} <= {epsilon}'
+        # )
         return distance <= epsilon
 
     def frontier_random_goal(self, new_frontier: Frontier) -> Pose:
