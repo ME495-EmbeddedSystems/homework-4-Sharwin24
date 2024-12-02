@@ -245,7 +245,7 @@ Visualization Manager:
       Enabled: true
       Name: GoalPose
       Namespaces:
-        {}
+        goal_pose: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -287,23 +287,23 @@ Visualization Manager:
       Filter (whitelist): ""
       Frame Timeout: 15
       Frames:
-        All Enabled: true
+        All Enabled: false
         base_footprint:
-          Value: true
+          Value: false
         base_laser:
-          Value: true
+          Value: false
         base_link:
           Value: true
         caster:
-          Value: true
+          Value: false
         left_wheel:
-          Value: true
+          Value: false
         map:
           Value: true
         odom:
           Value: true
         right_wheel:
-          Value: true
+          Value: false
       Marker Scale: 3
       Name: TF
       Show Arrows: true
@@ -371,16 +371,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 16.861989974975586
+      Distance: 25.70430564880371
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.7641473412513733
-        Y: -0.5957512855529785
-        Z: -0.5473235845565796
+        X: -1.4301475286483765
+        Y: -0.6583746075630188
+        Z: -1.1758596897125244
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
