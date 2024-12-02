@@ -21,9 +21,34 @@ def test_contains():
     frontier = Frontier(0, 0)
     r_min = frontier.min_radius
     r_max = frontier.max_radius
-    assert frontier.contains(0, 0)
+    assert not frontier.contains(0, 0)
+    assert not frontier.contains(r_min - 0.1, 0)
     assert frontier.contains(r_min, 0)
     assert frontier.contains(r_max, 0)
     assert frontier.contains(r_max - 0.5, 0)
     assert frontier.contains(r_min + 0.5, 0)
     assert frontier.contains(r_min + 0.1, r_min - 0.2)
+
+
+def test_random_pose():
+    """Test if random_pose method works."""
+    frontier = Frontier(0, 0)
+    random_pose = frontier.random_pose_polar()
+    assert frontier.contains(random_pose.position.x, random_pose.position.y)
+    random_pose = frontier.random_pose_cart()
+    assert frontier.contains(random_pose.position.x, random_pose.position.y)
+
+
+def test_union():
+    """Test if frontier union works."""
+    union = FrontierUnion()
+    frontier1 = Frontier(0, 0)
+    min_r = frontier1.min_radius
+    assert frontier1.contains(min_r + 0.1, 0)
+    frontier2 = Frontier(min_r + 0.1, 0)
+    union.frontiers.add(frontier1)
+    union.frontiers.add(frontier2)
+    assert len(union.frontiers) == 2
+    assert union.in_union(0, 0)
+    assert union.in_union(min_r + 0.1, 0)
+    assert not union.in_union(min_r - 0.1, 0)
