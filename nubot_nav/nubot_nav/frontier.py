@@ -9,7 +9,7 @@ class Frontier:
     # -------------- Begin_Citation [2] --------------#
     id_iter = itertools.count()
 
-    def __init__(self, x, y, min_radius=5.0, max_radius=6.0):
+    def __init__(self, x, y, min_radius=3.0, max_radius=5.0):
         self.id = next(self.id_iter)
     # -------------- End_Citation [2] --------------#
         self.x = x

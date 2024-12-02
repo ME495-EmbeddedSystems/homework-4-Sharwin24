@@ -262,9 +262,9 @@ class Explore(Node):
         arrow.type = Marker.ARROW
         arrow.action = Marker.ADD
         arrow.pose = msg.pose
-        arrow.scale.x = 1.0
-        arrow.scale.y = 0.2
-        arrow.scale.z = 0.2
+        arrow.scale.x = 1.5
+        arrow.scale.y = 0.25
+        arrow.scale.z = 0.25
         arrow.color.r = 1.0
         arrow.color.g = 0.0
         arrow.color.b = 1.0
@@ -367,9 +367,9 @@ class Explore(Node):
         marker.pose.position.x = frontier.x
         marker.pose.position.y = frontier.y
         marker.pose.position.z = 0.0
-        marker.scale.x = frontier.max_radius
-        marker.scale.y = frontier.max_radius
-        marker.scale.z = 0.1
+        marker.scale.x = 2*frontier.max_radius
+        marker.scale.y = 2*frontier.max_radius
+        marker.scale.z = 0.15
         if frontier.id == 0:
             marker.color.r = 0.0
             marker.color.g = 1.0
@@ -382,7 +382,7 @@ class Explore(Node):
             marker.color.r = 1.0
             marker.color.g = 0.0
             marker.color.b = 0.0
-        marker.color.a = 0.25
+        marker.color.a = 0.35
         return marker
 
     def yaw2quat(self, yaw: float):
