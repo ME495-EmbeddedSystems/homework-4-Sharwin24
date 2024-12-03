@@ -116,11 +116,12 @@ class Explore(Node):
                 self.send_robot(random_pose)
         else:
             # Current goal is None for first goal
-            first_goal = self.random_goal_pose()
-            self.get_logger().info(
-                'Sending Robot to first random goal: ' +
-                f'({first_goal.position.x:.3f}, {first_goal.position.y:.3f})'
+            first_goal = Pose(
+                position=self.robot_pose.position,
+                orientation=self.robot_pose.orientation
             )
+            # First goal should just drive forward a little bit
+            first_goal.position.x += 1.5
             self.send_robot(first_goal)
         # If the robot is not moving for a while, reselect a random goal
         if not self.robot_is_moving():
@@ -218,7 +219,7 @@ class Explore(Node):
         else:
             self.robot_unmoving_count = 0
 
-    def map_callback(self, msg: OccupancyGrid):
+    async def map_callback(self, msg: OccupancyGrid):
         """
         Save the map for navigation.
 

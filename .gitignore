@@ -2,3 +2,5 @@ build/
 log/
 install/
 __pycache__/
+*.mp4
+*.webm
