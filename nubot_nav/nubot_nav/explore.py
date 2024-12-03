@@ -305,7 +305,7 @@ class Explore(Node):
             self.saved_map.info.resolution + self.saved_map.info.origin.position.x
         random_y = random.random() * self.saved_map.info.height * \
             self.saved_map.info.resolution + self.saved_map.info.origin.position.y
-        while not self.is_goal_valid(random_x, random_y):
+        while not self.is_goal_valid(random_x, random_y, new_area=True):
             random_x = random.random() * self.saved_map.info.width * \
                 self.saved_map.info.resolution + self.saved_map.info.origin.position.x
             random_y = random.random() * self.saved_map.info.height * \
