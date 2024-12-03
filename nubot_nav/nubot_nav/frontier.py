@@ -34,7 +34,7 @@ class Frontier:
     # -------------- End_Citation [2] --------------#
         self.x = x
         self.y = y
-        self.min_radius = 3.0
+        self.min_radius = 3.5
         self.max_radius = 5.0
         self.explored = False
 

@@ -339,7 +339,19 @@ class Explore(Node):
                     self.saved_map.info.resolution)
         if 0 <= map_x < map_data.shape[1] and 0 <= map_y < map_data.shape[0]:
             # Free space is 0
-            return map_data[map_y, map_x] == 0
+            # Encourage the robot to explore new areas by choosing free spaces that are near
+            # unexplored areas
+            neighbors = [
+                (map_x + 1, map_y), (map_x - 1, map_y),
+                (map_x, map_y + 1), (map_x, map_y - 1),
+                (map_x + 1, map_y + 1), (map_x - 1, map_y - 1),
+                (map_x + 1, map_y - 1), (map_x - 1, map_y + 1)
+            ]
+            if map_data[map_y, map_x] == 0:
+                for nx, ny in neighbors:
+                    if 0 <= nx < map_data.shape[1] and 0 <= ny < map_data.shape[0]:
+                        if map_data[ny, nx] == -1:
+                            return True
         return False
 
     def robot_is_moving(self) -> bool:

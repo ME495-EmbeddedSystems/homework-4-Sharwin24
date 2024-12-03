@@ -122,7 +122,7 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.009999999776482582
+      Size (m): 0.07999999821186066
       Style: Flat Squares
       Topic:
         Depth: 5
@@ -233,7 +233,7 @@ Visualization Manager:
       Enabled: true
       Name: Frontiers
       Namespaces:
-        {}
+        frontier: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -261,8 +261,8 @@ Visualization Manager:
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
-      Line Style: Lines
-      Line Width: 0.029999999329447746
+      Line Style: Billboards
+      Line Width: 0.10000000149011612
       Name: Path
       Offset:
         X: 0
@@ -371,25 +371,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 25.70430564880371
+      Distance: 28.973026275634766
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -1.4301475286483765
-        Y: -0.6583746075630188
-        Z: -1.1758596897125244
+        X: -5.015396595001221
+        Y: -1.2572213411331177
+        Z: -2.5239181518554688
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6547969579696655
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 2.4704153537750244
+      Yaw: 3.1254289150238037
     Saved: ~
 Window Geometry:
   Displays:
