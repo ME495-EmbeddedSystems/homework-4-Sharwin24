@@ -319,7 +319,7 @@ class Explore(Node):
         goal_pose.orientation = self.yaw2quat(heading)
         return goal_pose
 
-    def is_goal_valid(self, x: float, y: float) -> bool:
+    def is_goal_valid(self, x: float, y: float, new_area: bool = False) -> bool:
         """
         Given a position, determine if it is a valid goal position within the occupancy grid.
 
@@ -327,6 +327,8 @@ class Explore(Node):
         :type x: float
         :param y: The y-coordinate of the goal position
         :type y: float
+        :param new_area: If the goal is in a new area, defaults to False
+        :type new_area: bool, optional
         :return: True if the point is marked as free in the occupancy grid, False otherwise
         :rtype: bool
         """
@@ -348,6 +350,8 @@ class Explore(Node):
                 (map_x + 1, map_y - 1), (map_x - 1, map_y + 1)
             ]
             if map_data[map_y, map_x] == 0:
+                if not new_area:
+                    return True
                 for nx, ny in neighbors:
                     if 0 <= nx < map_data.shape[1] and 0 <= ny < map_data.shape[0]:
                         if map_data[ny, nx] == -1:
